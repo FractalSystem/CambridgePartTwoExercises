@@ -16,5 +16,7 @@ susceptible to variations in the randomly selected initial values than the theor
 Source code is incorporated into "core_one.py". Results plotted in "supplementary_one_plot.pdf"
 
 Supplementary task 2 ("supplementary_two.py"):
-The near field complex amplitude integral was evaluated for three different values of distance
+The near field complex amplitude integral was evaluated for three different values of distance, D. Relative amplitude
+and phase were plotted as functions of distance from centre of screen. The results correspond with what we would expect,
+with the peaks in amplitude growing further apart as D increases.
 Source in file "supplementary_two.py". Results plotted in "supplementary_two_plot.pdf"
