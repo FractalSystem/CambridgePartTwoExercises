@@ -1,5 +1,8 @@
 import numpy as np
 import scipy.integrate
+import matplotlib
+
+matplotlib.use('agg')  # required to compile on MCS over SSH
 import matplotlib.pyplot as plt
 
 
@@ -14,9 +17,11 @@ def small_angle_plot(solution):
     ax1.set_xlabel("Time /s")
     ax1.set_ylabel("Theta /rad")
     ax1.set_title("Plot of theta against time for q = F = 0")
+    # ax1.set_xlim(left = 998*2*np.pi, right = 1000*2*np.pi)
     ax1.legend()
     plt.tight_layout()  # prevents cut off of y label
     plt.savefig("core_one_small_angle_plot.pdf")
+
 
 def plot_energy(solution):
     """
@@ -29,18 +34,25 @@ def plot_energy(solution):
     m = 1
     energy = 1 / 2 * m * (theta_dot * l) ** 2 + m * g * (l - l * np.cos(theta))
     initial_energy = 1 / 2 * m * (0 * l) ** 2 + m * g * (l - l * np.cos(0.01))
-    fig, ax1 = plt.subplots()
+
+    fig, (ax1, ax2) = plt.subplots(2, figsize=[3.2 * 2, 2.8 * 4])
+
     # Plot energy calculated for each element of the solution
     ax1.plot(t, energy, label="RK4 Energy")
+
     # Energy is conserved
     ax1.plot(t, [initial_energy] * (len(t)), label="Theoretical energy")
     ax1.legend()
     ax1.set_xlabel("Time /s")
-    ax1.set_ylabel("Energy /J")
+    ax1.set_ylabel("Energy /J/kg")
     ax1.set_title("Plot of energy against time for theoretical and \nRK4 solutions for 10,000 oscillations")
-    # plt.savefig("rk4_energy_conservation_plot.png")
+    ax2.plot(t, (1 - energy / initial_energy) * 100)
+    ax2.set_xlabel("Time /s")
+    ax2.set_ylabel("Percentage deviation /%")
+    ax2.set_title("Plot of percentage deviation of RK4 energy from \ntheoretical energy for 10,000 oscillations")
     plt.tight_layout()  # prevents cut off of y label
     plt.savefig("core_one_energy_conservation.pdf")
+
 
 def plot_period_theta(theta_initials, periods):
     fig, ax1 = plt.subplots()
@@ -67,8 +79,6 @@ def solve(y0, t_max, q, F):
         args=(q, F,),
         t_eval=np.linspace(0, t_max, 10000),
     )
-    # for i in range(len(solution.t)):
-    #     print(f"{solution.t[i]}, {solution.y[0, i]}, {solution.y[1,i]}")
     return solution
 
 
@@ -86,6 +96,8 @@ def solve_period(theta_initial):
         y0=y0,
         args=(q, F,),
         t_eval=np.linspace(0, t_max, 10000),
+        rtol=1e-6,
+        atol=1e-6
     )
 
     # routine to find mean period by sampling all zero crossing points of theta and averaging the differences.
@@ -117,7 +129,7 @@ def period_loop():
     """
     Call solve_period for a range of initial thetas and return periods
     """
-    theta_initials = np.linspace(0.01, np.pi - 0.01, 100)
+    theta_initials = np.linspace(0.01, np.pi - 0.01, 64)
     periods = []
     for theta_initial in theta_initials:
         period = solve_period(theta_initial)
@@ -144,5 +156,4 @@ if __name__ == "__main__":
     plot_period_theta(theta_initials, periods)
 
     # find period for theta initial = pi/2 as requested
-    print(f"Period for initial theta = pi/2: {solve_period(np.pi / 2)}s")  # answer = 7.267303598407302 s
-
+    print(f"Period for initial theta = pi/2: {solve_period(np.pi / 2)}s")  # answer = 7.411925566125717 s

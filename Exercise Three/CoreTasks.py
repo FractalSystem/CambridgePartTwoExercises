@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Define constants
-N = 2 ** 17  # Number of sample points in aperture. 2^n most efficient for FFT.
+N = 2 ** 18  # Number of sample points in aperture. 2^n most efficient for FFT.
 
 
 def plot_fft_core_one(near_field, Y, y, theoretical_Y, theoretical_y):
@@ -13,7 +13,7 @@ def plot_fft_core_one(near_field, Y, y, theoretical_Y, theoretical_y):
     :param y: (numpy.ndarray) Naturally ordered y-space coordinates, stretched to be have correct units (mm).
     :param theoretical_Y: (numpy.ndarray) Theoretical wavefunction for single slit array (sinc function).
     :param theoretical_y: (numpy.ndarray) y-coordinates of samples of theoretical wavefunction.
-    :return:
+    :return: None
     """
 
     fig, ax1 = plt.subplots()
@@ -35,10 +35,10 @@ def plot_fft_core_one(near_field, Y, y, theoretical_Y, theoretical_y):
     ax1.set_xlabel("y /mm")
     ax1.set_ylabel("Normalised intensity /No units")
     if not near_field:
-        ax1.set_title("Plot of intensity against y for a single slit in the far-field regime")
+        ax1.set_title("Plot of intensity against y for a single slit in the far-field regime. D = 1m")
         ax1.legend()
     else:
-        ax1.set_title("Plot of intensity against y for a single slit in the near-field regime")
+        ax1.set_title("Plot of intensity against y for a single slit in the near-field regime. D = 5mm")
         ax1.legend()
 
     # Save plot to pdf
@@ -56,7 +56,7 @@ def plot_FFT_core_two(near_field, y, Y):
     :param near_field: (bool) Flag stating whether we are plotting in the near field regime.
     :param Y: (numpy.ndarray) Naturally ordered FFT of the aperture function.
     :param y: (numpy.ndarray) Naturally ordered y-space coordinates, stretched to be have correct units (mm).
-    :return:
+    :return: None
     """
     fig, ax1 = plt.subplots()
     Y_intensity = (abs(Y) / max(abs(Y))) ** 2  # Normalise wavefunction and square magnitude
@@ -70,9 +70,9 @@ def plot_FFT_core_two(near_field, y, Y):
     ax1.set_xlabel("y /mm")
     ax1.set_ylabel("Normalised intensity /No units")
     if not near_field:
-        ax1.set_title("Plot of intensity against y for a grating in the far-field regime")
+        ax1.set_title("Plot of intensity against y for a grating in the far-field regime, D = 10m")
     else:
-        ax1.set_title("Plot of intensity against y for a grating in the near-field regime")
+        ax1.set_title("Plot of intensity against y for a grating in the near-field regime, D = 0.5m")
 
     # Save plot to pdf
     if near_field:
@@ -114,7 +114,7 @@ def generate_sin_aperture(L, d, m, s):
     :param d: (float) Slit width (mm)
     :param m: (float) Parameter in grating phase (dimensionless)
     :param s: (float) Parameter in grating phase (dimensionless)
-    :return:
+    :return: (numpy.ndarray) Aperture array
     """
     delta = L / N
 
@@ -123,7 +123,7 @@ def generate_sin_aperture(L, d, m, s):
     grating = 1.0 * np.exp((m / 2) * np.sin(2 * np.pi * x / s) * 1j)
     # grating = (m / 2) * np.sin(2 * np.pi * x / s)
 
-    # Initialise zero valued aperture
+    # Initialise zero valued aperture. complex128 required to prevent discard of imaginary part of modified aperture later
     aperture = np.zeros(N, dtype=np.complex128)
 
     # Set aperture equal to grating function between -d/2, +d/2
@@ -138,7 +138,7 @@ def core_one(near_field=False):
     Main program routine for Core Task 1. Defines problem parameters and calculates far-field diffraction pattern for
     single slit aperture.
     :param near_field: (bool) Flag stating whether we are plotting in the near field regime.
-    :return:
+    :return: None
     """
 
     # Define problem parameters
@@ -174,7 +174,7 @@ def core_one(near_field=False):
 
     # Theoretical result for a single slit
     theoretical_y = np.linspace(min(y), max(y), N)  # Sample theoretical solution only in range of numerical solution.
-    q = (2 * np.pi / wavelength) * np.sin(np.arctan(theoretical_y / D))
+    q = (2 * np.pi / wavelength) * np.sin(np.arctan(theoretical_y / D)) # q = k*sin(y/D)
     theoretical_Y = d * np.sin(q * d / 2) / (q * d / 2)
 
     # Plot numerical and theoretical solutions
@@ -186,13 +186,13 @@ def core_two(near_field=False):
     Main routine for Core Task 2. Defines problem parameters and calculates far-field diffraction pattern for
     sinusoidal aperture.
     :param near_field: (bool) Flag stating whether we are plotting in the near field regime.
-    :return:
+    :return: None
     """
 
     # Define parameters
     L = 10.0  # aperture extent in mm
     d = 2.0  # slit width in mm
-    m = 8.0  # Aperture phase prefactor in mm
+    m = 8.0  # Aperture phase prefactor
     s = 0.1  # spacing of phase maxima in mm
     fresnel_distance = 8000.0  # d^2/wavelength in mm
     D = 10000  # screen distance in mm
