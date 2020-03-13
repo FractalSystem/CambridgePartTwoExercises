@@ -1,5 +1,7 @@
 import numpy.random as random
 import numpy as np
+import matplotlib
+matplotlib.use('pdf') # required to compile on MCS over SSH
 import matplotlib.pyplot as plt
 import time
 
@@ -12,7 +14,7 @@ def integrand(input):
 
 def estimate_average_f(N):
     # Uses Monte-Carlo routine to randomly sample f
-    # initiate pythonic list to store sampled values of the integrand, more efficient than np array here.
+    # Initiate pythonic list to store sampled values of the integrand, more efficient than np array here.
     f_list = []
     for i in range(N):
         # initiate 1D array of random values in range [0,s]
@@ -35,15 +37,16 @@ def plot_errors(results_list):
     fig, ax1 = plt.subplots()
     ax1.set_yscale("log")
     ax1.set_xscale("log")
-    ax1.set_ylabel("log(Sampled Error)")
-    ax1.set_xlabel("log(N)")
+    ax1.set_ylabel("log(Sampled Error /No Units)")
+    ax1.set_xlabel("log(N /No Units)")
     ax1.set_title("Plot of sampled error against N")
     ax1.plot(Ns, errors, label="Sampled error")
+
     # Calculate normalisation value to match expected relationship to results
-    normalisation_k = errors[0] / Ns[0]
+    normalisation_k = errors[0] / Ns[0] ** -0.5
     ax1.plot(Ns, normalisation_k * np.power(Ns, -1 / 2), label="Theoretical relationship", linestyle="dashed")
     ax1.legend()
-    plt.savefig("error_plot.pdf")
+    plt.savefig("core_one_error_plot.pdf")
 
 
 def plot_theoretical_error(results_list):
@@ -51,8 +54,8 @@ def plot_theoretical_error(results_list):
     errors = [dic.get("sampled_error") for dic in results_list]
     theoretical_errors = [dic.get("theoretical_error") for dic in results_list]
     fig, ax1 = plt.subplots()
-    ax1.set_ylabel("Error")
-    ax1.set_xlabel("N")
+    ax1.set_ylabel("Error /No Units")
+    ax1.set_xlabel("N /No Units")
     ax1.plot(Ns, theoretical_errors, label="Theoretical error")
     ax1.plot(Ns, errors, label="Sampled error")
     ax1.set_title("Plot of theoretical and sampled error against N")
@@ -77,7 +80,7 @@ def main_loop(N_list, N_t=25):
         estimates_array = np.array(estimates_list)
         mean = np.mean(estimates_array)
         theoretical_error_mean = np.mean(theoretical_error_list)
-        # print(theoretical_error_list)
+
         # RMS error in mean, from estimates
         sampled_error = np.std(estimates_array)
         results_list.append(
@@ -86,12 +89,14 @@ def main_loop(N_list, N_t=25):
 
 
 if __name__ == "__main__":
-    N_list = np.linspace(1, 400, 100, dtype=int).tolist()
+    N_list = np.arange(10, 400, 4, dtype=int).tolist()
 
     # Prove N^(-1/2) relationship
     print("Beginning error calculation.")
     results_list = main_loop(N_list, N_t=25)
     plot_errors(results_list)
+
+    # Supplementary task one
     plot_theoretical_error(results_list)
     print("Finished error calculation.")
 

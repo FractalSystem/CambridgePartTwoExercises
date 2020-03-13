@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+matplotlib.use('pdf') # required to compile on MCS over SSH
 import matplotlib.pyplot as plt
 from scipy import integrate
 
@@ -15,7 +17,9 @@ def plot(c_list, s_list):
     ax.set_ylabel("S(u)")
     ax.set_title("Plot of the Cornu spiral")
     plt.plot(c_list, s_list)
-    plt.savefig("cornu_spiral_plot.pdf")
+    plt.plot(0.5, 0.5, "r+")
+    plt.plot(-0.5, -0.5, "r+")
+    plt.savefig("core_two_cornu_spiral_plot.pdf")
 
 
 def main():
