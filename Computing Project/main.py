@@ -5,6 +5,7 @@ import matplotlib.animation
 from multiprocessing import Pool
 from asteroid import Asteroid
 from pooled_process import pooled_process
+import json
 
 
 ### TEST ONLY
@@ -38,16 +39,8 @@ class Main():
         # Plot COM
         ax1.plot(0, 0, 'b+')
 
-    def plot_orbit(self):
+    def plot_orbit(self, r_a_initial, v_a_initial):
         # Gives the default orbital view
-        # Initial conditions of asteroid
-        r_a_initial = [constants.R * np.sin(np.pi / 6),
-                       constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                                   constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
-                           np.pi / 6),
-                       0]  # Asteroid vector displacement from COM
-        r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
-        v_a_initial = [0, 0, 0]
 
         # Define asteroid and simulate its orbit
         asteroid = Asteroid(r_a_initial, v_a_initial)
@@ -146,20 +139,15 @@ class Main():
         # Define a set of initial conditions in r_a, v_a phase space
         # Call solve orbit in parallel
         # Evaluate maximum wander using R_max
-        grid_size = 4
-        r_values = np.linspace(-0.05, +0.05, grid_size)
+        grid_size = 64
+        r_values = np.linspace(-0.5, +0.5, grid_size)
         r_lagrange_point = np.array([constants.R * np.sin(np.pi / 6),
                                      constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
                                              constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(np.pi / 6),
                                      0])  # Asteroid vector displacement from COM
 
-        r_lagrange_point = [5,20,0]
+        # Define 2D arrays X, Y about the lagrange point for the wander to be evaluated at
         X, Y = np.meshgrid(r_values+r_lagrange_point[0], r_values+r_lagrange_point[1])
-
-        print(X)
-        print(Y)
-        from time import sleep
-        sleep(3)
 
         r_max_array = np.zeros((grid_size, grid_size))
 
@@ -176,8 +164,32 @@ class Main():
         # Define pool and map input_list to the pooled processes
         pool = Pool(4)
         result = pool.map(pooled_process, input_list)
-        print(result)
-        print(np.concatenate(result))
+
+        # result is a 2D array (i, j) corresponding to coordinates X[i][j], Y[i][j]
+        result = np.concatenate(result).reshape((grid_size, grid_size))
+        # print(result.shape)
+        # print(result, X, Y)
+        #
+        # plt.contour(X, Y, result)
+        # plt.show()
+        self.save_results(result, X, Y)
+
+    def save_results(self, result, X, Y):
+        dic = {"X": X.tolist(), "Y": Y.tolist(), "results": result.tolist()}
+        with open("results.txt", 'w') as f:
+            f.write(json.dumps(dic))
+
+    def load_results(self, filename):
+        with open(filename, "r") as f:
+            dic = json.loads(f.read())
+        return dic.get("X"), dic.get("Y"), dic.get("results")
+
+    def plot_wander(self, X, Y, results):
+        fig, ax1 = plt.subplots()
+        cp = ax1.contour(X, Y, np.log(results)/np.log(10), 1000)
+        self.plot_extras(ax1)
+        fig.colorbar(cp)
+        plt.show()
 
 
     def plot_potential(self):
@@ -217,7 +229,26 @@ class Main():
 
 if __name__ == "__main__":
     main_obj = Main()
-    # main_obj.plot_orbit()
+
+    # Initial conditions of asteroid
+    r_a_initial = [constants.R * np.sin(np.pi / 6),
+                   constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+                           constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
+                       np.pi / 6),
+                   0]  # Asteroid vector displacement from COM
+    r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
+    v_a_initial = [0, 0, 0]
+    # main_obj.plot_orbit(r_a_initial, v_a_initial)
+
+    X, Y, results = main_obj.load_results("results64large.txt")
+    print(np.max(results))
+    # print(np.where(np.isclose(results, np.max(results))))
+    # print(results[18][0])
+    # r_a_initial = [X[18][0], Y[18][0], 0]
+    # main_obj.plot_orbit(r_a_initial, v_a_initial)
+    # main_obj.plot_wander(X, Y, results)
+
+
     # main_obj.animate()
     main_obj.evaluate_wander()
     # main_obj.plot_potential()
