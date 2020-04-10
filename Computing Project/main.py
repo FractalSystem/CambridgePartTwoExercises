@@ -6,6 +6,7 @@ from multiprocessing import Pool
 from asteroid import Asteroid
 from pooled_process import pooled_process
 import json
+from time import time
 
 
 ### TEST ONLY
@@ -38,6 +39,7 @@ class Main():
 
         # Plot COM
         ax1.plot(0, 0, 'b+')
+
 
     def plot_orbit(self, r_a_initial, v_a_initial):
         # Gives the default orbital view
@@ -186,10 +188,45 @@ class Main():
 
     def plot_wander(self, X, Y, results):
         fig, ax1 = plt.subplots()
-        cp = ax1.contour(X, Y, np.log(results)/np.log(10), 1000)
-        self.plot_extras(ax1)
+        cp = ax1.contourf(X, Y, np.log(results)/np.log(10), 1000)
+        # self.plot_extras(ax1)
         fig.colorbar(cp)
         plt.show()
+
+    def plot_position(self):
+        # generate initial variable list
+        # evaluate
+        # plot
+
+        r_list = np.linspace(0, 0.1, 100)
+        r_max_list = []
+        r_lagrange_point = np.array([constants.R * np.sin(np.pi / 6),
+                                     constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+                                             constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(np.pi / 6),
+                                     0])
+        for dR in r_list:
+            r_a_initial = [(constants.R + dR) * np.sin(np.pi / 6),
+                           (constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+                                   constants.MASS_SUN + constants.MASS_JUPITER))+dR) * np.cos(
+                               np.pi / 6),
+                           0]  # Asteroid vector displacement from COM
+            asteroid = Asteroid(r_a_initial, [0,0,0])
+            t, r_a, v_a = asteroid.solve_orbit(100)
+            r_max = np.amax(np.sqrt((r_a[0] - r_lagrange_point[0]) ** 2 + (r_a[1] - r_lagrange_point[1]) ** 2))
+            r_max_list.append(r_max)
+            print("done")
+        with open("position.txt", 'w') as f:
+            f.write(json.dumps([r_list.tolist(), r_max_list]))
+        print(r_max_list)
+        fig, (ax1,ax2) = plt.subplots(2)
+        ax1.plot(r_list, r_max_list)
+        # self.plot_extras(ax1)
+        #
+        # plt.gca().set_aspect('equal', adjustable='box')
+        plt.show()
+
+
+
 
 
     def plot_potential(self):
@@ -230,25 +267,43 @@ class Main():
 if __name__ == "__main__":
     main_obj = Main()
 
+    #########
     # Initial conditions of asteroid
-    r_a_initial = [constants.R * np.sin(np.pi / 6),
-                   constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                           constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
-                       np.pi / 6),
-                   0]  # Asteroid vector displacement from COM
-    r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
-    v_a_initial = [0, 0, 0]
+    # r_a_initial = [constants.R * np.sin(np.pi / 6),
+    #                constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+    #                        constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
+    #                    np.pi / 6),
+    #                0]  # Asteroid vector displacement from COM
+    # r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
+    # v_a_initial = [0, 0, 0]
     # main_obj.plot_orbit(r_a_initial, v_a_initial)
 
-    X, Y, results = main_obj.load_results("results64large.txt")
-    print(np.max(results))
+    #########
+
+    X, Y, results = main_obj.load_results("results64largeaccurate.txt")
+
+    # To plot max wander result
+    # print(np.max(results))
     # print(np.where(np.isclose(results, np.max(results))))
-    # print(results[18][0])
-    # r_a_initial = [X[18][0], Y[18][0], 0]
+    # print(results[20][41])
+    # r_a_initial = [X[20][41], Y[20][41], 0]
     # main_obj.plot_orbit(r_a_initial, v_a_initial)
+
     # main_obj.plot_wander(X, Y, results)
 
+    ########
+
+    main_obj.plot_position()
 
     # main_obj.animate()
-    main_obj.evaluate_wander()
+
+
+    # start_time = time()
+    # main_obj.evaluate_wander()
+    # print(f"Took {time()-start_time}")
+
+
     # main_obj.plot_potential()
+
+
+

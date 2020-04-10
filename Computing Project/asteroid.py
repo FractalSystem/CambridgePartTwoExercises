@@ -40,6 +40,6 @@ class Asteroid():
                                              t_span=(0, t_max),
                                              t_eval=np.linspace(0, t_max, 5000),
                                              y0=np.concatenate((self.r_initial, self.v_initial)),
-                                             rtol=10**-6)
+                                             rtol=10**-3)
         t, r_a, v_a = (solution.t, solution.y[:3], solution.y[3:6])
         return t, r_a, v_a
