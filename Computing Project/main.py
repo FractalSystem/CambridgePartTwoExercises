@@ -275,7 +275,7 @@ if __name__ == "__main__":
     #                    np.pi / 6),
     #                0]  # Asteroid vector displacement from COM
     # r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
-    # v_a_initial = [0, 0, 0]
+    v_a_initial = [0, 0, 0]
     # main_obj.plot_orbit(r_a_initial, v_a_initial)
 
     #########
@@ -283,17 +283,17 @@ if __name__ == "__main__":
     X, Y, results = main_obj.load_results("results64largeaccurate.txt")
 
     # To plot max wander result
-    # print(np.max(results))
-    # print(np.where(np.isclose(results, np.max(results))))
-    # print(results[20][41])
-    # r_a_initial = [X[20][41], Y[20][41], 0]
-    # main_obj.plot_orbit(r_a_initial, v_a_initial)
+    print(np.max(results))
+    print(np.where(np.isclose(results, np.max(results))))
+    print(results[20][41])
+    r_a_initial = [X[20][41], Y[20][41], 0]
+    main_obj.plot_orbit(r_a_initial, v_a_initial)
 
     # main_obj.plot_wander(X, Y, results)
 
     ########
 
-    main_obj.plot_position()
+    # main_obj.plot_position()
 
     # main_obj.animate()
 

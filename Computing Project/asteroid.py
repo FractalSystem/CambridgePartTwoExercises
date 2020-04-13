@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.integrate
 import constants
+import time
 
 
 
@@ -35,11 +36,15 @@ class Asteroid():
 
     def solve_orbit(self, n_orbits):
         # initial_conditions are given when class is initiated
+        start_time = time.time()
         t_max = n_orbits * self.orbital_period
         solution = scipy.integrate.solve_ivp(self.derivatives,
                                              t_span=(0, t_max),
                                              t_eval=np.linspace(0, t_max, 5000),
                                              y0=np.concatenate((self.r_initial, self.v_initial)),
-                                             rtol=10**-3)
+                                             rtol=10**-4,
+                                             atol = 10**-6,
+                                             method = scipy.integrate.RK45)
         t, r_a, v_a = (solution.t, solution.y[:3], solution.y[3:6])
+        print(f"Took {time.time()-start_time}s")
         return t, r_a, v_a
