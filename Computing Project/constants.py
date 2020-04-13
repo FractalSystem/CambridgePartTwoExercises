@@ -7,4 +7,8 @@ MASS_SUN = 1.0  # in solar masses
 R = 5.2  # distance between Jupiter and Sun in AU
 
 # ffmpeg is required to save animations. Under Windows the exe can be downloaded from https://ffmpeg.zeranoe.com/builds/
-FFMPEG_PATH = r"C:\Users\Noah\Desktop\ffmpeg.exe"
+FFMPEG_PATH = r"C:\ffmpeg.exe"
+
+# print(MASS_JUPITER*MASS_SUN/(MASS_JUPITER+MASS_SUN))
+# omega = np.sqrt(G * (MASS_SUN + MASS_JUPITER) / R ** 3)
+# print(2*np.pi/omega)

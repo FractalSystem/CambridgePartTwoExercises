@@ -7,12 +7,12 @@ from asteroid import Asteroid
 from pooled_process import pooled_process
 import json
 from time import time
+import os
 
 
 ### TEST ONLY
 # r_a = [2.5948051948051956, 4.50333209967908, 0]
 # omega = [0, 0,0.5298767365821111]
-
 
 
 class Main():
@@ -34,19 +34,18 @@ class Main():
         ax1.add_artist(sun_circle)
 
         # Plot Jupiter's location
-        jupiter_circle = plt.Circle((self.r_j[0], self.r_j[1]), 0.1, color = "#9a9aff")
+        jupiter_circle = plt.Circle((self.r_j[0], self.r_j[1]), 0.1, color="#9a9aff")
         ax1.add_artist(jupiter_circle)
 
         # Plot COM
         ax1.plot(0, 0, 'b+')
 
-
-    def plot_orbit(self, r_a_initial, v_a_initial):
+    def plot_orbit(self, r_a_initial, v_a_initial, n_orbits=100):
         # Gives the default orbital view
 
-        # Define asteroid and simulate its orbit
+        # Define asteroid and simulate its trajectory for n_orbits orbits of Jupiter
         asteroid = Asteroid(r_a_initial, v_a_initial)
-        t, r_a, v_a = asteroid.solve_orbit(100)
+        t, r_a, v_a = asteroid.solve_orbit(n_orbits)
 
         # Plot overview of orbit
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[3.2 * 4, 2.8 * 2])
@@ -70,7 +69,7 @@ class Main():
         # Model orbit of asteroid about Lagrange point
         r_a_initial = [constants.R * np.sin(np.pi / 6),
                        constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                                   constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
+                               constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
                            np.pi / 6),
                        0]  # Asteroid vector displacement from COM
         v_a_initial = [0, 0, 0]
@@ -97,33 +96,34 @@ class Main():
         point, = ax1.plot([], [], "ro", markersize=3)
 
         # Define graphic to show orbit location
-        sun_circle = plt.Circle((6, -6), 0.15, color="k")
-        radius_line = plt.Circle((6, -6), 0.8, color="k", fill=False, linewidth=0.2)
+        sun_circle = plt.Circle((-6, 6), 0.15, color="k")
+        radius_line = plt.Circle((-6, 6), 0.8, color="k", fill=False, linewidth=0.2)
         ax1.add_artist(sun_circle)
         ax1.add_artist(radius_line)
+        text = ax1.text(-4.8, 6, "t = 0 Yr")
 
         # Define orbit properties for graphic
         omega = np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)
-        period = 2*np.pi/omega
-        initial_angle = np.pi/2 # Additional phase to make graphic plot match large plot at t=0
-
+        period = 2 * np.pi / omega
+        initial_angle = np.pi / 2  # Additional phase to make graphic plot match large plot at t=0
 
         # Define animation function
         def animate(i):
             line.set_data(r_a[0][0:i], r_a[1][0:i])
             line_zoomed.set_data(r_a[0][0:i], r_a[1][0:i])
             time = t[i]
-            angle = ((time%period)/period)*2*np.pi+initial_angle
-            x = 6+0.8*np.sin(angle)
-            y = -6+0.8*np.cos(angle)
-            point.set_data(x,y)
-            return line, line_zoomed, point
+            angle = ((time % period) / period) * 2 * np.pi + initial_angle
+            x = -6 + 0.8 * np.sin(angle)
+            y = 6 + 0.8 * np.cos(angle)
+            point.set_data(x, y)
+            text.set_text(f"t = {int(t[i])} Yr")
+            return line, line_zoomed, point, text
 
         # Calculate interval and number of frames needed
-        FPS = 60.0 # Frames per second in Hz
+        FPS = 60.0  # Frames per second in Hz
         ANIM_LENGTH = 20.0  # Animation length in seconds
-        interval = 1/FPS
-        frames = int(ANIM_LENGTH*FPS)
+        interval = 1 / FPS
+        frames = int(ANIM_LENGTH * FPS)
 
         # Define animation
         animation = matplotlib.animation.FuncAnimation(fig, animate, frames=frames, interval=interval, blit=True)
@@ -131,7 +131,7 @@ class Main():
         # Save animation
         plt.rcParams['animation.ffmpeg_path'] = constants.FFMPEG_PATH
         FFWriter = matplotlib.animation.writers['ffmpeg']
-        writer = FFWriter(fps=FPS, metadata=dict(artist='Noah Crew-Gee (nc506)'), bitrate=2000)
+        writer = FFWriter(fps=FPS, metadata=dict(artist='Cambridge Computing Project 2020'), bitrate=2000)
         animation.save('out.mp4', writer=writer)
 
         # plt.show()
@@ -149,7 +149,7 @@ class Main():
                                      0])  # Asteroid vector displacement from COM
 
         # Define 2D arrays X, Y about the lagrange point for the wander to be evaluated at
-        X, Y = np.meshgrid(r_values+r_lagrange_point[0], r_values+r_lagrange_point[1])
+        X, Y = np.meshgrid(r_values + r_lagrange_point[0], r_values + r_lagrange_point[1])
 
         r_max_array = np.zeros((grid_size, grid_size))
 
@@ -160,11 +160,11 @@ class Main():
                 input_list.append((X, Y, r_lagrange_point, i, j))
 
         # Split input list into sections of length n
-        n = int(len(input_list)/4)
+        n = int(len(input_list) / 4)
         input_list = [input_list[i:i + n] for i in range(0, len(input_list), n)]
 
         # Define pool and map input_list to the pooled processes
-        pool = Pool(4)
+        pool = Pool()
         result = pool.map(pooled_process, input_list)
 
         # result is a 2D array (i, j) corresponding to coordinates X[i][j], Y[i][j]
@@ -188,7 +188,7 @@ class Main():
 
     def plot_wander(self, X, Y, results):
         fig, ax1 = plt.subplots()
-        cp = ax1.contourf(X, Y, np.log(results)/np.log(10), 1000)
+        cp = ax1.contourf(X, Y, np.log(results) / np.log(10), 1000)
         # self.plot_extras(ax1)
         fig.colorbar(cp)
         plt.show()
@@ -207,10 +207,10 @@ class Main():
         for dR in r_list:
             r_a_initial = [(constants.R + dR) * np.sin(np.pi / 6),
                            (constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                                   constants.MASS_SUN + constants.MASS_JUPITER))+dR) * np.cos(
+                                   constants.MASS_SUN + constants.MASS_JUPITER)) + dR) * np.cos(
                                np.pi / 6),
                            0]  # Asteroid vector displacement from COM
-            asteroid = Asteroid(r_a_initial, [0,0,0])
+            asteroid = Asteroid(r_a_initial, [0, 0, 0])
             t, r_a, v_a = asteroid.solve_orbit(100)
             r_max = np.amax(np.sqrt((r_a[0] - r_lagrange_point[0]) ** 2 + (r_a[1] - r_lagrange_point[1]) ** 2))
             r_max_list.append(r_max)
@@ -218,20 +218,24 @@ class Main():
         with open("position.txt", 'w') as f:
             f.write(json.dumps([r_list.tolist(), r_max_list]))
         print(r_max_list)
-        fig, (ax1,ax2) = plt.subplots(2)
+        fig, (ax1, ax2) = plt.subplots(2)
         ax1.plot(r_list, r_max_list)
         # self.plot_extras(ax1)
         #
         # plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
 
-
-
-
-
     def plot_potential(self):
+        # Modify ratio of masses to get illustrative plot
+        mass_ratio = 0.01
+        MODIFIED_MASS_JUPITER = mass_ratio * constants.MASS_SUN
+
+        # Re-derive r_s for modified mass ratio
+        r_s = np.array([-MODIFIED_MASS_JUPITER * constants.R / (MODIFIED_MASS_JUPITER + constants.MASS_SUN), 0,
+                        0])  # Vector displacement from COM to Sun
+
         # Derive angular velocity of rotating frame
-        omega = np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)
+        omega = np.sqrt(constants.G * (constants.MASS_SUN + MODIFIED_MASS_JUPITER) / constants.R ** 3)
 
         # Initiate 2D grid centred on the sun
         xlist = np.linspace(-7.0, 7.0, 1000)
@@ -239,13 +243,16 @@ class Main():
         X, Y = np.meshgrid(xlist, ylist)
 
         # Effective potential is sum of potential from each mass + centripetal force potential. Coriolis force cannot be plotted due to dependence on asteroid velocity.
-        potential = -constants.G * (constants.MASS_SUN / np.sqrt(X ** 2 + Y ** 2) + constants.MASS_JUPITER / np.sqrt(
-            (X - constants.R) ** 2 + Y ** 2)) - 1 / 2 * omega ** 2 * ((X + self.r_s[0]) ** 2 + Y ** 2)
+        potential = -constants.G * (constants.MASS_SUN / np.sqrt(X ** 2 + Y ** 2) + MODIFIED_MASS_JUPITER / np.sqrt(
+            (X - constants.R) ** 2 + Y ** 2)) - 1 / 2 * omega ** 2 * ((X + r_s[0]) ** 2 + Y ** 2)
+
+        # Effective potential is sum of potential from each mass + centripetal force potential. Coriolis force cannot be plotted due to dependence on asteroid velocity.
+        # potential = -constants.G * (constants.MASS_SUN / np.sqrt(X ** 2 + Y ** 2) + constants.MASS_JUPITER / np.sqrt(
+        #     (X - constants.R) ** 2 + Y ** 2)) - 1 / 2 * omega ** 2 * ((X + self.r_s[0]) ** 2 + Y ** 2)
 
         # potential from com has same problem
-        potential = -constants.G * (constants.MASS_SUN/ np.sqrt((X-self.r_s[0])**2 + Y**2)+constants.MASS_JUPITER/
-                                    np.sqrt((X-self.r_j[0])**2+Y**2)) - 1/2 * omega**2 * (X**2+Y**2)
-
+        # potential = -constants.G * (constants.MASS_SUN/ np.sqrt((X-self.r_s[0])**2 + Y**2)+constants.MASS_JUPITER/
+        #                             np.sqrt((X-self.r_j[0])**2+Y**2)) - 1/2 * omega**2 * (X**2+Y**2)
 
         # Find and mark positions of maxima in Z
         Z_max = np.amax(potential)
@@ -255,6 +262,7 @@ class Main():
             x_coord, y_coord = maxima[0][i], maxima[1][i]
             x, y = X[x_coord][y_coord], Y[x_coord][y_coord]
             ax1.plot(x, y, 'b+')
+            print(x,y)
 
         # Plot contour plot of potential
         cp = ax1.contour(X, Y, potential, np.linspace(Z_max - 8, Z_max - 0.004, 200))
@@ -269,27 +277,28 @@ if __name__ == "__main__":
 
     #########
     # Initial conditions of asteroid
-    # r_a_initial = [constants.R * np.sin(np.pi / 6),
-    #                constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-    #                        constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
-    #                    np.pi / 6),
-    #                0]  # Asteroid vector displacement from COM
+    r_a_initial = [constants.R * np.sin(np.pi / 6),
+                   constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+                           constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
+                       np.pi / 6),
+                   0]  # Asteroid vector displacement from COM
     # r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
     v_a_initial = [0, 0, 0]
-    # main_obj.plot_orbit(r_a_initial, v_a_initial)
+    # main_obj.plot_orbit(r_a_initial, v_a_initial, n_orbits=1000)
 
     #########
 
-    X, Y, results = main_obj.load_results("results64largeaccurate.txt")
+    # X, Y, results = main_obj.load_results("results64largeaccurate.txt")
+    X, Y, results = main_obj.load_results("results.txt")
 
     # To plot max wander result
-    print(np.max(results))
-    print(np.where(np.isclose(results, np.max(results))))
-    print(results[20][41])
-    r_a_initial = [X[20][41], Y[20][41], 0]
-    main_obj.plot_orbit(r_a_initial, v_a_initial)
+    # print(np.max(results))
+    # print(np.where(np.isclose(results, np.max(results))))
+    # print(results[20][41])
+    # r_a_initial = [X[20][41], Y[20][41], 0]
+    # main_obj.plot_orbit(r_a_initial, v_a_initial)
 
-    # main_obj.plot_wander(X, Y, results)
+    main_obj.plot_wander(X, Y, results)
 
     ########
 
@@ -297,13 +306,10 @@ if __name__ == "__main__":
 
     # main_obj.animate()
 
-
     # start_time = time()
     # main_obj.evaluate_wander()
-    # print(f"Took {time()-start_time}")
+    # print(f"Took {time()-start_time}") #7417.462097167969
 
+    main_obj.plot_potential()
 
-    # main_obj.plot_potential()
-
-
-
+    # omega = np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)

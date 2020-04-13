@@ -4,7 +4,6 @@ import constants
 import time
 
 
-
 class Asteroid():
     def __init__(self, r_initial, v_initial):
         self.r_initial = r_initial
@@ -46,5 +45,5 @@ class Asteroid():
                                              atol = 10**-6,
                                              method = scipy.integrate.RK45)
         t, r_a, v_a = (solution.t, solution.y[:3], solution.y[3:6])
-        print(f"Took {time.time()-start_time}s")
+        # print(f"Took {time.time()-start_time}s")
         return t, r_a, v_a
