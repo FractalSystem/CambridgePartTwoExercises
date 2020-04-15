@@ -5,15 +5,24 @@ import time
 
 
 class Asteroid():
-    def __init__(self, r_initial, v_initial):
+    def __init__(self, r_initial, v_initial, planet_mass = None):
+        # Check if a custom planet mass is to be used for the system
+        if planet_mass:
+            self.MASS_JUPITER = planet_mass
+        else:
+            self.MASS_JUPITER = constants.MASS_JUPITER
+
+        # Set initial conditions
         self.r_initial = r_initial
         self.v_initial = v_initial
-        self.omega = [0, 0, np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)]
+
+        # Derive omega and orbital period
+        self.omega = [0, 0, np.sqrt(constants.G * (constants.MASS_SUN + self.MASS_JUPITER) / constants.R ** 3)]
         self.orbital_period = 2 * np.pi / np.linalg.norm(self.omega)
 
         # Take coordinate centre as centre of mass of system
-        self.r_s = np.array([-constants.MASS_JUPITER * constants.R / (constants.MASS_JUPITER + constants.MASS_SUN), 0, 0])  # Vector displacement from COM to Sun
-        self.r_j = np.array([constants.MASS_SUN * constants.R / (constants.MASS_JUPITER + constants.MASS_SUN), 0, 0])  # Vector displacement from COM to Jupiter
+        self.r_s = np.array([-self.MASS_JUPITER * constants.R / (self.MASS_JUPITER + constants.MASS_SUN), 0, 0])  # Vector displacement from COM to Sun
+        self.r_j = np.array([constants.MASS_SUN * constants.R / (self.MASS_JUPITER + constants.MASS_SUN), 0, 0])  # Vector displacement from COM to Jupiter
 
     def derivatives(self, t, y):
         r_a = y[:3]
@@ -24,7 +33,7 @@ class Asteroid():
         r_a_to_j = self.r_j - r_a
 
         # Define force per unit asteroid mass due to gravity
-        F = constants.G * constants.MASS_SUN * r_a_to_s / (np.linalg.norm(r_a_to_s) ** 3) + constants.G * constants.MASS_JUPITER * r_a_to_j / (
+        F = constants.G * constants.MASS_SUN * r_a_to_s / (np.linalg.norm(r_a_to_s) ** 3) + constants.G * self.MASS_JUPITER * r_a_to_j / (
                 np.linalg.norm(r_a_to_j) ** 3)
 
         # Define equations of motion

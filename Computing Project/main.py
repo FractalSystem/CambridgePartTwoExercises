@@ -4,7 +4,7 @@ import constants
 import matplotlib.animation
 from multiprocessing import Pool
 from asteroid import Asteroid
-from pooled_process import pooled_process
+from pooled_process import pooled_process_position, pooled_process_velocity
 import json
 from time import time
 import os
@@ -48,20 +48,24 @@ class Main():
         t, r_a, v_a = asteroid.solve_orbit(n_orbits)
 
         # Plot overview of orbit
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[3.2 * 4, 2.8 * 2])
-        ax1.set_xlim((0, 7))
-        ax1.set_ylim((0, 7))
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[3.0 * 4, 2.8 * 2])
+        ax1.set_xlim((-7, 7))
+        ax1.set_ylim((-7, 7))
         ax1.plot(r_a[0], r_a[1])
         self.plot_extras(ax1)
-        ax1.set_xlabel("x /Au")
-        ax1.set_ylabel("y /Au")
+        ax1.set_xlabel("x /AU")
+        ax1.set_ylabel("y /AU")
 
         # Plot zoomed in view of asteroid orbit
         ax2.plot(r_a[0], r_a[1])
-        ax2.set_xlabel("x /Au")
-        ax2.set_ylabel("y /Au")
+        ax2.set_xlabel("x /AU")
+        ax2.set_ylabel("y /AU")
+
+        # plot starting point
+        ax2.plot(r_a[0][0], r_a[1][0], 'r+')
 
         # plt.gca().set_aspect('equal', adjustable='box')
+        plt.savefig("fig.png")
         plt.show()
 
     def animate(self):
@@ -82,10 +86,10 @@ class Main():
         ax1.set_ylim((-7, 7))
         ax2.set_xlim((np.min(r_a[0]), np.max(r_a[0])))
         ax2.set_ylim((np.min(r_a[1]), np.max(r_a[1])))
-        ax1.set_xlabel("x /Au")
-        ax1.set_ylabel("y /Au")
-        ax2.set_xlabel("x /Au")
-        ax2.set_ylabel("y /Au")
+        ax1.set_xlabel("x /AU")
+        ax1.set_ylabel("y /AU")
+        ax2.set_xlabel("x /AU")
+        ax2.set_ylabel("y /AU")
 
         # Plot Sun and Jupiter
         self.plot_extras(ax1)
@@ -132,17 +136,16 @@ class Main():
         plt.rcParams['animation.ffmpeg_path'] = constants.FFMPEG_PATH
         FFWriter = matplotlib.animation.writers['ffmpeg']
         writer = FFWriter(fps=FPS, metadata=dict(artist='Cambridge Computing Project 2020'), bitrate=2000)
-        animation.save('out.mp4', writer=writer)
+        animation.save('animation1.mp4', writer=writer)
 
         # plt.show()
 
-    def evaluate_wander(self):
+    def evaluate_wander(self, grid_size):
         # Only for initial position for now
         # Define a set of initial conditions in r_a, v_a phase space
         # Call solve orbit in parallel
         # Evaluate maximum wander using R_max
-        grid_size = 64
-        r_values = np.linspace(-0.5, +0.5, grid_size)
+        r_values = np.linspace(-1.0, +1.0, grid_size)
         r_lagrange_point = np.array([constants.R * np.sin(np.pi / 6),
                                      constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
                                              constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(np.pi / 6),
@@ -151,13 +154,12 @@ class Main():
         # Define 2D arrays X, Y about the lagrange point for the wander to be evaluated at
         X, Y = np.meshgrid(r_values + r_lagrange_point[0], r_values + r_lagrange_point[1])
 
-        r_max_array = np.zeros((grid_size, grid_size))
 
         # Generate input_list to supply initial conditions to worker processes
         input_list = []
         for i in range(grid_size):
             for j in range(grid_size):
-                input_list.append((X, Y, r_lagrange_point, i, j))
+                input_list.append([X[i][j], Y[i][j], r_lagrange_point])
 
         # Split input list into sections of length n
         n = int(len(input_list) / 4)
@@ -165,13 +167,50 @@ class Main():
 
         # Define pool and map input_list to the pooled processes
         pool = Pool()
-        result = pool.map(pooled_process, input_list)
+        result = pool.map(pooled_process_position, input_list)
 
         # result is a 2D array (i, j) corresponding to coordinates X[i][j], Y[i][j]
         result = np.concatenate(result).reshape((grid_size, grid_size))
         # print(result.shape)
         # print(result, X, Y)
         #
+        # plt.contour(X, Y, result)
+        # plt.show()
+        self.save_results(result, X, Y)
+
+    def evaluate_wander_velocity(self, grid_size):
+        # Define a set of initial conditions in r_a, v_a phase space
+        # Call solve orbit in parallel
+        # Evaluate maximum wander using R_max
+        v_values = np.linspace(-0.4, +0.4, grid_size)
+        r_lagrange_point = np.array([constants.R * np.sin(np.pi / 6),
+                                     constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+                                             constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(np.pi / 6),
+                                     0])  # Asteroid vector displacement from COM
+
+        # Define 2D arrays X, Y about the lagrange point for the wander to be evaluated at
+        X, Y = np.meshgrid(v_values, v_values)
+
+
+        # Generate input_list to supply initial conditions to worker processes
+        input_list = []
+        for i in range(grid_size):
+            for j in range(grid_size):
+                input_list.append([X[i][j], Y[i][j], r_lagrange_point])
+
+        # Split input list into sections of length n
+        n = int(len(input_list) / 4)
+        input_list = [input_list[i:i + n] for i in range(0, len(input_list), n)]
+
+        # print(np.array(input_list).shape)
+
+        # Define pool and map input_list to the pooled processes
+        pool = Pool()
+        result = pool.map(pooled_process_velocity, input_list)
+
+        # result is a 2D array (i, j) corresponding to coordinates X[i][j], Y[i][j]
+        result = np.concatenate(result).reshape((grid_size, grid_size))
+
         # plt.contour(X, Y, result)
         # plt.show()
         self.save_results(result, X, Y)
@@ -189,8 +228,11 @@ class Main():
     def plot_wander(self, X, Y, results):
         fig, ax1 = plt.subplots()
         cp = ax1.contourf(X, Y, np.log(results) / np.log(10), 1000)
-        # self.plot_extras(ax1)
-        fig.colorbar(cp)
+        ax1.set_xlabel("$v_x$ /AUYr$^{-1}$")
+        ax1.set_ylabel("$v_y$ /AUYr$^{-1}$")
+        cbar = fig.colorbar(cp)
+        cbar.set_label('log(Wander /AU)')
+        plt.savefig("fig.png")
         plt.show()
 
     def plot_position(self):
@@ -225,9 +267,8 @@ class Main():
         # plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
 
-    def plot_potential(self):
+    def plot_potential(self, mass_ratio):
         # Modify ratio of masses to get illustrative plot
-        mass_ratio = 0.01
         MODIFIED_MASS_JUPITER = mass_ratio * constants.MASS_SUN
 
         # Re-derive r_s for modified mass ratio
@@ -257,18 +298,45 @@ class Main():
         # Find and mark positions of maxima in Z
         Z_max = np.amax(potential)
         maxima = np.where(np.isclose(potential, Z_max, rtol=10 ** -8))  # maxima is tuple : ([x_coords], [y_coords])
-        fig, ax1 = plt.subplots(1, 1)
+        fig, ax1 = plt.subplots()
         for i in range(len(maxima[0])):
             x_coord, y_coord = maxima[0][i], maxima[1][i]
             x, y = X[x_coord][y_coord], Y[x_coord][y_coord]
             ax1.plot(x, y, 'b+')
-            print(x,y)
 
         # Plot contour plot of potential
         cp = ax1.contour(X, Y, potential, np.linspace(Z_max - 8, Z_max - 0.004, 200))
-        fig.colorbar(cp)
-        ax1.set_xlabel("x /Au")
-        ax1.set_ylabel("y /Au")
+        cbar = fig.colorbar(cp)
+        cbar.set_label('Potential /M$_{\odot}$AU$^2$Yr$^{-2}$')
+        ax1.set_xlabel("x /AU")
+        ax1.set_ylabel("y /AU")
+        plt.savefig("fig.png")
+        plt.show()
+
+    def evaluate_mass_wander(self):
+
+        # r_lagrange = [2.5994800519948007, 4.50333209967908,0]
+        v_a_initial = [0,0,0]
+        # Masses between 0.01 and 0.00001 solar masses
+        # masses = np.logspace(-5, -2, num=6,base = 10.0)*constants.MASS_SUN
+        masses = np.linspace(0.0005, 0.01, num = 50)*constants.MASS_SUN
+        r_max_list = []
+        for mass in masses:
+            r_lagrange = [constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+                    constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
+                np.pi / 3),
+                           constants.R * np.sin(np.pi / 3),
+                           0]  # Position of L4 YEP!
+            # r_lagrange = [constants.R*1/2*()]
+            asteroid = Asteroid(r_lagrange, v_a_initial, planet_mass=mass)
+            t, r_a, v_a = asteroid.solve_orbit(200)
+            r_max = np.amax(np.sqrt((r_a[0] - r_lagrange[0]) ** 2 + (r_a[1] - r_lagrange[1]) ** 2))
+            r_max_list.append(r_max)
+            print(r_max)
+        with open("out.txt", "w") as f:
+            f.write(json.dumps({"r_max_list":r_max_list, "masses": masses.tolist()}))
+        fig, ax1 = plt.subplots()
+        ax1.plot(masses, r_max_list)
         plt.show()
 
 
@@ -277,18 +345,22 @@ if __name__ == "__main__":
 
     #########
     # Initial conditions of asteroid
-    r_a_initial = [constants.R * np.sin(np.pi / 6),
-                   constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                           constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
-                       np.pi / 6),
-                   0]  # Asteroid vector displacement from COM
-    # r_a_initial = np.array(r_a_initial) + np.array([-0.05, +0.05, 0])  # CARE! Perturbing initial radius
+
+    r_a_initial = [constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
+            constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
+        np.pi / 3),
+                  constants.R * np.sin(np.pi / 3),
+                  0]  # Position of L4 YEP!
     v_a_initial = [0, 0, 0]
-    # main_obj.plot_orbit(r_a_initial, v_a_initial, n_orbits=1000)
+    r_a_initial = np.array(r_a_initial) + np.array([+0.002*constants.R, +0.002*constants.R, 0])  # Fig 2
+    # r_a_initial = np.array([-1.006* constants.R, 0, 0]) # Fig 3
+    # r_a_initial = [2.49552, 4.35744, 0]
+    # v_a_initial = [0.2, 0.2, 0]
+    main_obj.plot_orbit(r_a_initial, v_a_initial, n_orbits=16)
 
     #########
 
-    # X, Y, results = main_obj.load_results("results64largeaccurate.txt")
+    # X, Y, results = main_obj.load_results("results64largeaccurate.txt
     X, Y, results = main_obj.load_results("results.txt")
 
     # To plot max wander result
@@ -298,7 +370,7 @@ if __name__ == "__main__":
     # r_a_initial = [X[20][41], Y[20][41], 0]
     # main_obj.plot_orbit(r_a_initial, v_a_initial)
 
-    main_obj.plot_wander(X, Y, results)
+    # main_obj.plot_wander(X, Y, results)
 
     ########
 
@@ -307,9 +379,16 @@ if __name__ == "__main__":
     # main_obj.animate()
 
     # start_time = time()
-    # main_obj.evaluate_wander()
-    # print(f"Took {time()-start_time}") #7417.462097167969
+    # main_obj.evaluate_wander(16)
+    # print(f"Took {time()-start_time}") #7417.462097167969 for 64x64
 
-    main_obj.plot_potential()
+    # start_time = time()
+    # main_obj.evaluate_wander_velocity(64) # 6100s
+    # print(f"Took {time()-start_time}") #7417.462097167969 for 64x64
+
+    # main_obj.plot_potential(0.01)
+    # main_obj.plot_potential(0.0133333)
 
     # omega = np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)
+
+    main_obj.evaluate_mass_wander()
