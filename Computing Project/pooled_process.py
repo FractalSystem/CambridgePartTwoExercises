@@ -1,8 +1,14 @@
+# Small file which is loaded by each created process during evaluation of wander.
 from time import time
 from asteroid import Asteroid
 import numpy as np
 
 def pooled_process_position(args):
+    """
+    Evaluate wander based on input list of initial values.
+    :param args:
+    :return:
+    """
     r_max_list = []
     for item in args:
         time_start = time()
