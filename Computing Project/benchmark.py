@@ -1,3 +1,7 @@
+#######################
+# File responsible for benchmarking of derivatives functions
+#######################
+
 import numpy as np
 import constants
 import time

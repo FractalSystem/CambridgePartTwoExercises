@@ -1,3 +1,8 @@
+#######################
+# File defines the class Main which contains all logic, plotting and saving functions. It also serves as the
+# entry point of the program.
+#######################
+
 import numpy as np
 import matplotlib.pyplot as plt
 import constants
@@ -7,16 +12,21 @@ from asteroid import Asteroid
 from pooled_process import pooled_process_position, pooled_process_velocity
 import json
 from time import time
+import scipy.stats
 
 
 class Main:
     def __init__(self):
-        # Take coordinate centre as centre of mass of system
+        """
+        Constructor method for class main. Used to set up vectors r_s and r_j to prevent multiple recalculations of them.
+        """
+        # Define vector displacement from COM to Sun
         self.r_s = np.array([-constants.MASS_JUPITER * constants.R / (constants.MASS_JUPITER + constants.MASS_SUN), 0,
-                             0])  # Vector displacement from COM to Sun
+                             0])
 
+        # Define vector displacement from COM to Jupiter
         self.r_j = np.array([constants.MASS_SUN * constants.R / (constants.MASS_JUPITER + constants.MASS_SUN), 0,
-                             0])  # Vector displacement from COM to Jupiter
+                             0])
 
     def plot_extras(self, ax1):
         """
@@ -54,7 +64,6 @@ class Main:
 
         # Plot overview of orbit (axis 1)
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[3.0 * 4, 2.8 * 2])
-        print(type(ax1))
         ax1.set_xlim((-7, 7))
         ax1.set_ylim((-7, 7))
         ax1.plot(r_a[0], r_a[1])
@@ -72,7 +81,6 @@ class Main:
 
         # Save figure
         plt.savefig("fig.png")
-        plt.show()
 
     def animate(self):
         """
@@ -283,39 +291,6 @@ class Main:
 
         # Save figure
         plt.savefig("fig.png")
-        plt.show()
-
-    def plot_position(self):
-        # generate initial variable list
-        # evaluate
-        # plot
-
-        r_list = np.linspace(0, 0.1, 100)
-        r_max_list = []
-        r_lagrange_point = [constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
-            np.pi / 3),
-                            constants.R * np.sin(np.pi / 3),
-                            0]
-        for dR in r_list:
-            r_a_initial = [(constants.R + dR) * np.sin(np.pi / 6),
-                           (constants.R * ((constants.MASS_SUN - constants.MASS_JUPITER) / (
-                                   constants.MASS_SUN + constants.MASS_JUPITER)) + dR) * np.cos(
-                               np.pi / 6),
-                           0]  # Asteroid vector displacement from COM
-            asteroid = Asteroid(r_a_initial, [0, 0, 0])
-            t, r_a, v_a = asteroid.solve_orbit(100)
-            r_max = np.amax(np.sqrt((r_a[0] - r_lagrange_point[0]) ** 2 + (r_a[1] - r_lagrange_point[1]) ** 2))
-            r_max_list.append(r_max)
-        with open("position.txt", 'w') as f:
-            f.write(json.dumps([r_list.tolist(), r_max_list]))
-        print(r_max_list)
-        fig, (ax1, ax2) = plt.subplots(2)
-        ax1.plot(r_list, r_max_list)
-        # self.plot_extras(ax1)
-        #
-        # plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
 
     def plot_potential(self, mass_ratio):
         """
@@ -362,7 +337,6 @@ class Main:
 
         # Save figure
         plt.savefig("fig.png")
-        plt.show()
 
     def evaluate_mass_wander(self):
         """
@@ -373,17 +347,18 @@ class Main:
         v_a_initial = [0, 0, 0]
 
         # Populate an array of masses to iterate over
-        masses = np.linspace(0.0001, 0.01, num=100) * constants.MASS_SUN
+        # masses = np.linspace(0.0001, 0.05, num=100) * constants.MASS_SUN
+        masses = np.logspace(-5, -2, num=100)
 
         # Evaluate masses between a given range of solar masses.
         r_max_list = []
         for mass in masses:
             # Recalculate Lagrange point (L4) position
             r_lagrange = [constants.R * ((constants.MASS_SUN - mass) / (
-                    constants.MASS_SUN + mass)) * np.cos(np.pi / 3),constants.R * np.sin(np.pi / 3),0]
+                    constants.MASS_SUN + mass)) * np.cos(np.pi / 3), constants.R * np.sin(np.pi / 3), 0]
 
             # Perturb Lagrange point
-            r_lagrange = np.array(r_lagrange) + np.array([-0.0006 * constants.R, +0.0006 * constants.R, 0])
+            # r_lagrange = np.array(r_lagrange) + np.array([-0.0006 * constants.R, +0.0006 * constants.R, 0])
 
             # Define a new asteroid with specified planet mass
             asteroid = Asteroid(r_lagrange, v_a_initial, planet_mass=mass)
@@ -397,16 +372,64 @@ class Main:
             # Append range of wander to list to be plotted
             r_max_list.append(r_max)
 
+            # Print output as loop executes for debugging
             print(r_max, mass)
 
         # Open file and dump results to it for future evaluation
         with open("out.txt", "w") as f:
             f.write(json.dumps({"r_max_list": r_max_list, "masses": masses.tolist()}))
 
-        # Plot graph of wander against masses and show
-        fig, ax1 = plt.subplots()
-        ax1.plot(masses, r_max_list)
-        plt.show()
+    def plot_mass_wander(self, max_fit_index=None):
+        """
+        Plot and perform linear regression on previously calculated mass ratio - wander data, stored in the file "out.txt".
+        :param max_fit_index: (int) Index up to which to include in linear regression analysis.
+        :return: None
+        """
+
+        # Load data from disk
+        with open("out.txt", "r") as f:
+            dic = json.loads(f.read())
+        r_max_list = dic.get("r_max_list")
+        masses = dic.get("masses")
+
+        # If no max_fit_index then just perform linear regression on entire data-set
+        if max_fit_index is None:
+            max_fit_index = len(masses)
+
+        # Take natural log of masses and r_max_list for second graph and fitting purposes
+        ln_masses = np.log(masses)
+        ln_r_max = np.log(r_max_list)
+
+        # Fit log-log graph using linear regression
+        slope, intercept, r_val, p_val, std_err = scipy.stats.linregress(ln_masses[:max_fit_index],
+                                                                         ln_r_max[:max_fit_index])
+        fit_coefficients = [slope, intercept]
+
+        # Output linear fit results
+        print(
+            f"Linear regression of log-log found relationship: y = kx^n where k = {np.exp(fit_coefficients[1])} and n = {fit_coefficients[0]}, with an R^2 value of {r_val**2}")
+
+        # Define plotting parameters
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[3.0 * 4, 2.8 * 2])
+
+        # Plot data
+        ax1.plot(masses, r_max_list, label="Data")
+        ax1.plot(masses, np.exp(fit_coefficients[1]) * masses ** fit_coefficients[0], label="Fit")
+        ax2.plot(ln_masses, ln_r_max, label="Data", marker="+")
+        ax2.plot(ln_masses, fit_coefficients[0] * ln_masses + fit_coefficients[1], label="Fit")
+
+        # Set axis labels
+        ax1.set_xlabel("Planet-Sun mass ratio /No Units")
+        ax1.set_ylabel("Range of wander /AU")
+        ax2.set_xlabel("ln(Planet-Sun mass ratio /No Units)")
+        ax2.set_ylabel("ln(Range of wander /AU)")
+
+        # Include legends
+        ax1.legend()
+        ax2.legend()
+
+        # Save figure
+        plt.savefig("fig.png")
 
     def evaluate_energy_conservation(self, r_a_initial, v_a_initial, n_orbits):
         """
@@ -426,8 +449,9 @@ class Main:
         r_a = np.transpose(r_a)
         v_a = np.transpose(v_a)
 
-        # Define omega
+        # Define omega and orbital period
         omega = np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)
+        period = 2 * np.pi / omega
 
         # Iterate over each time sample and calculate total energy
         energy_list = []
@@ -440,7 +464,7 @@ class Main:
             # Calculate gravitational potential energy
             graviatational_potential = -constants.G * (
                     constants.MASS_SUN / np.linalg.norm(r_a_to_s) + constants.MASS_JUPITER / np.linalg.norm(r_a_to_j))
-            
+
             # Calculate kinetic energy due to rotating frame
             kinetic_energy_rot = 0.5 * r ** 2 * omega ** 2
 
@@ -448,19 +472,25 @@ class Main:
             kinetic_energy_frame = 0.5 * np.linalg.norm(v_a[i]) ** 2
 
             # Calculate total kinetic energy
-            kinetic_energy = kinetic_energy_rot + kinetic_energy_frame
+            kinetic_energy = -kinetic_energy_rot + kinetic_energy_frame
 
             # Append total energy to energy_list
-            energy_list.append(graviatational_potential + kinetic_energy)
+            energy_list.append(kinetic_energy + graviatational_potential)
 
-        # Plot all energies as a percentage of initial energy
-        plt.plot(t, np.array(energy_list) / energy_list[0] * 100)
+        fig, ax1 = plt.subplots()
 
-        # Plot expected theoretical energy line (100%)
-        plt.hlines(100, np.min(t), np.max(t))
+        # Plot all energies as a percentage deviation from initial energy
+        ax1.plot(t / period, (np.array(energy_list) / energy_list[0] - 1) * 100)
 
-        # Show plot
-        plt.show()
+        # Plot expected theoretical energy line
+        ax1.hlines(0, np.min(t), np.max(t / period))
+
+        # Set axis labels
+        ax1.set_xlabel("Number of orbits /No Units")
+        ax1.set_ylabel("|Percentage deviation from expected energy| /%")
+
+        # Save plot
+        plt.savefig("fig.png")
 
     def time_it(self, func, args):
         """
@@ -481,51 +511,35 @@ class Main:
 
 
 if __name__ == "__main__":
+    # Define main_obj used to call all functions in Main
     main_obj = Main()
 
-    #########
-    # Initial conditions of asteroid
+    # Set initial conditions of asteroid
     r_a_initial = [constants.R * (
             (constants.MASS_SUN - constants.MASS_JUPITER) / (constants.MASS_SUN + constants.MASS_JUPITER)) * np.cos(
         np.pi / 3), constants.R * np.sin(np.pi / 3), 0]
 
     v_a_initial = [0, 0, 0]
-    # r_a_initial = np.array(r_a_initial) + [0, 0, 0]
 
-    # r_a_initial = np.array(r_a_initial)+[0.001*constants.R, 0.001*constants.R, 0]
-    r_a_initial = np.array(r_a_initial) + np.array([-0.001 * constants.R, +0.001 * constants.R, 0])
-    # r_a_initial = np.array(r_a_initial) + np.array([+0.002 * constants.R, +0.002 * constants.R, 0])  # Fig 2
-    # r_a_initial = np.array([-1.006* constants.R, 0, 0]) # Fig 3
-    main_obj.plot_orbit(r_a_initial, v_a_initial, n_orbits=50000)
-    #########
+    # Plot orbit from initial conditions
+    main_obj.plot_orbit(r_a_initial, v_a_initial, n_orbits=285)
 
-    # X, Y, results = main_obj.load_results("results64largeaccurate.txt
+    # Create animation
+    main_obj.animate()
+
+    # Plot potential contour plot
+    main_obj.plot_potential(0.01)
+
+    # Evaluate wander using position phase space grid of 64x64
+    main_obj.evaluate_wander(64)
+
+    # Evaluate wander using velocity phase space grid of 64x64
+    main_obj.evaluate_wander_velocity(64)
+
+    # Load results from wander calculation and plot
     X, Y, results = main_obj.load_results("results.txt")
+    main_obj.plot_wander(X, Y, results)
 
-
-    # main_obj.plot_wander(X, Y, results)
-
-    ########
-
-    # main_obj.plot_position()
-
-    # main_obj.animate()
-
-    # start_time = time()
-    # main_obj.evaluate_wander(32)
-    # print(f"Took {time()-start_time}s") #7417.462097167969 for 64x64
-
-    # start_time = time()
-    # main_obj.evaluate_wander_velocity(64) # 6100s
-    # print(f"Took {time()-start_time}") #7417.462097167969 for 64x64
-
-    # main_obj.time_it(main_obj.plot_potential, (0.01,))
-    # main_obj.plot_potential(0.0133333)
-    # main_obj.time_it(main_obj.plot_potential, (0.01,))
-
-    # omega = np.sqrt(constants.G * (constants.MASS_SUN + constants.MASS_JUPITER) / constants.R ** 3)
-
-    # main_obj.plot_position()
+    # Evaluate wander as a function of Planet-Sun mass and plot from saved results
     main_obj.evaluate_mass_wander()
-
-    # main_obj.evaluate_energy_conservation(r_a_initial, v_a_initial, 10000)
+    main_obj.plot_mass_wander()
